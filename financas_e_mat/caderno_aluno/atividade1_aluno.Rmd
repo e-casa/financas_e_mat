@@ -1,0 +1,282 @@
+---
+title: "Matemática Financeira com R — Atividade 1"
+subtitle: "Variação percentual e estatística descritiva com dados reais"
+author: "Nome do estudante: ___________________________"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    number_sections: true
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 5)
+```
+
+---
+
+# Apresentação
+
+Este caderno é um **documento reproduzível** — conceito introduzido por Gandrud (2020). Ao executar os blocos de código (*chunks*) abaixo, você gera automaticamente os cálculos e os gráficos que compõem o relatório final. Qualquer colega que tiver acesso a este arquivo pode reproduzir exatamente os mesmos resultados.
+
+**Princípio fundamental:** um resultado matemático só é confiável se outro pesquisador consegue reproduzi-lo, seguindo os mesmos passos, com os mesmos dados.
+
+---
+
+# O problema
+
+> Um estudante recebeu uma herança de **R\$ 10.000,00** em janeiro de 2023 e considera investir em ações de uma empresa da B3. Dois anos depois, em dezembro de 2025, quanto esse investimento valeria? A decisão teria sido melhor do que aplicar o mesmo valor na poupança?
+
+## Etapa 1 — Compreender o problema
+
+Antes de qualquer cálculo, responda às perguntas abaixo com seu grupo:
+
+**1.1.** O que significa uma ação "valorizar"? O que provoca essa valorização?
+
+> *[Escreva sua resposta aqui]*
+
+**1.2.** Que informações você precisaria para responder à pergunta central?
+
+> *[Escreva sua resposta aqui]*
+
+**1.3.** Qual a diferença entre o preço de "fechamento" e o preço de "fechamento ajustado" de uma ação?
+
+> *[Escreva sua resposta aqui]*
+
+---
+
+# Carregando os dados
+
+## Etapa 2 — Planejar a solução
+
+Antes de executar o código, escreva com suas palavras o que cada passo abaixo faz:
+
+**Passo A — Carregar o pacote quantmod:** `___________________________`
+
+**Passo B — A função `getSymbols()`:** `___________________________`
+
+**Passo C — A função `Ad()`:** `___________________________`
+
+## Carregamento dos dados
+
+```{r parametros}
+# ── PARÂMETROS: altere aqui para explorar outro ativo ou período ──────────────
+ATIVO         <- "PETR4.SA"   # Experimente: VALE3.SA, ITUB4.SA, ABEV3.SA
+DATA_INICIO   <- "2023-01-01"
+DATA_FIM      <- "2025-12-31"
+INVESTIMENTO  <- 10000        # R$
+TAXA_POUPANCA <- 0.005        # 0,5% ao mês
+```
+
+```{r carregar_dados}
+library(quantmod)
+library(tidyverse)
+
+# getSymbols() se conecta ao Yahoo Finance e baixa os dados históricos.
+# O argumento auto.assign = FALSE evita criar um objeto com nome automático.
+dados <- getSymbols(ATIVO,
+                    src         = "yahoo",
+                    from        = DATA_INICIO,
+                    to          = DATA_FIM,
+                    auto.assign = FALSE)
+
+# Ad() extrai o preço de fechamento ajustado por dividendos e desdobramentos
+preco <- Ad(dados)
+
+cat("Dados carregados:", nrow(dados), "pregões\n")
+cat("Período:", as.character(start(dados)), "a", as.character(end(dados)), "\n")
+```
+
+```{r explorar}
+# Visualizar as primeiras linhas
+cat("Primeiras linhas:\n")
+print(head(dados))
+
+# Estatísticas descritivas do preço de fechamento ajustado
+cat("\nEstatísticas do preço de fechamento ajustado:\n")
+print(summary(preco))
+```
+
+**Pergunta:** Quantas colunas tem o objeto `dados`? O que cada uma representa?
+
+> *[Escreva sua resposta aqui]*
+
+---
+
+# Calculando a variação percentual
+
+## Etapa 3 — Executar o plano
+
+A fórmula da variação percentual entre dois instantes é:
+
+$$\Delta\% = \left(\frac{P_f}{P_i} - 1\right) \times 100$$
+
+onde $P_i$ é o preço inicial e $P_f$ é o preço final.
+
+```{r variacao_pct}
+preco_inicial <- as.numeric(first(preco))
+preco_final   <- as.numeric(last(preco))
+
+# Complete o cálculo abaixo:
+variacao_pct <- (preco_final / preco_inicial - 1) * 100
+
+cat(sprintf("Preço inicial (%s): R$ %.2f\n", DATA_INICIO, preco_inicial))
+cat(sprintf("Preço final   (%s): R$ %.2f\n", DATA_FIM,    preco_final))
+cat(sprintf("Variação no período: %.2f%%\n", variacao_pct))
+```
+
+**Confira manualmente:** usando a fórmula acima, o resultado de `variacao_pct` faz sentido?
+
+> *[Mostre o cálculo aqui]*
+
+---
+
+# Retornos diários e risco
+
+O **retorno logarítmico diário** é calculado como:
+
+$$r_t = \ln\left(\frac{P_t}{P_{t-1}}\right)$$
+
+Ele tem propriedades estatísticas convenientes: é simétrico (ganhos e perdas equivalentes têm o mesmo valor absoluto) e **aditivo** ao longo do tempo (o retorno acumulado é a soma dos retornos diários).
+
+```{r retornos}
+# diff(log(preco)) calcula log(Pt) - log(Pt-1) = log(Pt/Pt-1)
+retorno_log <- diff(log(preco))
+retorno_log <- na.omit(retorno_log)
+
+retorno_medio <- mean(retorno_log) * 100
+desvio_padrao <- sd(retorno_log) * 100
+
+cat("--- Estatísticas dos retornos logarítmicos diários ---\n")
+cat(sprintf("Retorno médio diário : %.4f%%\n", retorno_medio))
+cat(sprintf("Desvio padrão diário : %.4f%%\n", desvio_padrao))
+cat(sprintf("Retorno mínimo       : %.2f%%\n", min(retorno_log) * 100))
+cat(sprintf("Retorno máximo       : %.2f%%\n", max(retorno_log) * 100))
+```
+
+**Interpretação:** o desvio padrão dos retornos é uma medida de **risco** (volatilidade). Um desvio padrão diário de X% significa que, em um dia típico, o preço pode variar aproximadamente X% para cima ou para baixo.
+
+**Pergunta:** Como o desvio padrão desta ação se compara ao "risco" da poupança?
+
+> *[Escreva sua resposta aqui]*
+
+---
+
+# Histograma dos retornos
+
+```{r histograma, fig.cap="Distribuição dos retornos logarítmicos diários"}
+retorno_df <- data.frame(retorno = as.numeric(retorno_log) * 100)
+
+ggplot(retorno_df, aes(x = retorno)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 60, fill = "steelblue", color = "white", alpha = 0.8) +
+  stat_function(fun  = dnorm,
+                args = list(mean = mean(retorno_df$retorno),
+                            sd   = sd(retorno_df$retorno)),
+                color = "red", linewidth = 1.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+  labs(title = paste("Distribuição dos retornos diários —", ATIVO),
+       subtitle = paste(DATA_INICIO, "a", DATA_FIM),
+       x = "Retorno diário (%)",
+       y = "Densidade",
+       caption = "Curva vermelha: distribuição normal com mesma média e desvio padrão") +
+  theme_minimal(base_size = 13)
+```
+
+**Pergunta:** A distribuição dos retornos se parece com a curva normal (linha vermelha)? Onde os dados se afastam mais da curva? O que isso pode significar?
+
+> *[Escreva sua resposta aqui]*
+
+---
+
+# Comparação com a poupança
+
+Usando a fórmula de **juros compostos** para o rendimento da poupança:
+
+$$M = C \times (1 + i)^n$$
+
+onde $C$ é o capital inicial, $i$ é a taxa mensal e $n$ é o número de meses.
+
+```{r poupanca}
+n_meses <- as.numeric(difftime(as.Date(DATA_FIM), as.Date(DATA_INICIO),
+                                units = "days")) / 30.44
+
+# Complete os cálculos abaixo (substitua os "___" pela fórmula correta):
+rendimento_poupanca_pct <- ((1 + TAXA_POUPANCA)^n_meses - 1) * 100
+valor_acoes             <- INVESTIMENTO * (1 + variacao_pct / 100)
+valor_poupanca          <- INVESTIMENTO * (1 + rendimento_poupanca_pct / 100)
+
+cat(sprintf("Período: %.0f meses\n", n_meses))
+cat(sprintf("Rendimento poupança no período: %.2f%%\n", rendimento_poupanca_pct))
+cat(sprintf("Valor final em %s:  R$ %.2f\n", ATIVO, valor_acoes))
+cat(sprintf("Valor final na poupança: R$ %.2f\n", valor_poupanca))
+cat(sprintf("Diferença: R$ %.2f\n", valor_acoes - valor_poupanca))
+```
+
+---
+
+# Gráfico histórico de preços
+
+```{r grafico_historico, fig.cap="Histórico do preço de fechamento ajustado"}
+preco_df <- data.frame(
+  data  = index(preco),
+  preco = as.numeric(preco)
+)
+
+ggplot(preco_df, aes(x = data, y = preco)) +
+  geom_line(color = "steelblue", linewidth = 0.8) +
+  labs(title = paste("Histórico de preços —", ATIVO),
+       subtitle = paste(DATA_INICIO, "a", DATA_FIM),
+       x = "Data", y = "Preço de fechamento ajustado (R$)") +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b/%Y") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+# Etapa 4 — Verificar e retrospectar
+
+Com base em tudo que você calculou e observou, responda:
+
+**4.1.** O investimento nas ações foi melhor ou pior do que a poupança? A diferença foi grande ou pequena?
+
+> *[Escreva sua resposta aqui]*
+
+**4.2.** A comparação com a poupança é completamente justa? Liste pelo menos três fatores que não foram considerados nos cálculos.
+
+> *[Escreva sua resposta aqui]*
+
+**4.3.** Como o resultado mudaria se você tivesse analisado apenas o ano de 2024? Teste: altere `DATA_INICIO` e `DATA_FIM` no bloco de parâmetros e re-execute o documento.
+
+> *[Anote o novo resultado aqui]*
+
+**4.4.** Desafio — Viés de sobrevivência: esta empresa ainda existe. Se um investidor tivesse escolhido uma empresa que foi à falência durante o período, qual seria o resultado? O que isso nos diz sobre como escolhemos os dados para analisar?
+
+> *[Escreva sua resposta aqui]*
+
+---
+
+# Gerando o relatório
+
+Para gerar este documento como HTML ou PDF, clique em **Knit** no RStudio, ou execute no console:
+
+```r
+rmarkdown::render("atividade1_aluno.Rmd", output_format = "html_document")
+```
+
+---
+
+# Referências
+
+POLYA, George. *A Arte de Resolver Problemas*. Rio de Janeiro: Interciência, 2006.
+
+RYAN, Jeffrey A.; ULRICH, Joshua M. quantmod: Quantitative Financial Modelling Framework. R package version 0.4.26, 2024. Disponível em: https://CRAN.R-project.org/package=quantmod.
+
+GANDRUD, Christopher. *Reproducible Research with R and RStudio*. 3. ed. Boca Raton: Chapman and Hall/CRC, 2020.
